@@ -1,0 +1,21 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: git config --global user.email ci@example.com && git config --global user.name ci
+      - run: python3 tests/test_detectors.py
+      - name: Self scan
+        run: python3 -m leakscan .
+      - name: Browser patterns are in sync
+        run: python3 -m leakscan --dump-patterns-js | diff - docs/patterns.js

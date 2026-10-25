@@ -1,0 +1,32 @@
+# Copy this file into any repo to fail the build when an AI API key, a Claude Code
+# session link or a .env file lands in the history. Runs on every push and weekly.
+#
+# To watch every public repo of a user or org instead, set OWNER below.
+name: leakscan
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+env:
+  OWNER: ""   # e.g. "genzagents" to scan the whole org's public repos on the schedule
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # full history, or the scan is pointless
+      - name: Fetch leakscan
+        run: curl -sL https://raw.githubusercontent.com/genzagents/leakscan/main/leakscan/__init__.py -o /tmp/leakscan.py
+      - name: Scan this repo
+        run: python3 /tmp/leakscan.py .
+      - name: Scan the whole org
+        if: env.OWNER != '' && github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 /tmp/leakscan.py github "$OWNER"

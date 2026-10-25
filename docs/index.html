@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>leakscan</title>
+<meta name="description" content="Find leaked AI API keys, Claude Code session links and committed .env files in your repo and its whole git history. Then rotate the right thing.">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #111318; --muted: #5b6270; --line: #e4e7ec; --card: #f6f7f9;
+    --accent: #c2410c; --ok: #15803d; --crit: #b91c1c; --high: #c2410c; --med: #a16207;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1013; --fg: #e8eaee; --muted: #9aa3b2; --line: #262a31; --card: #161a20;
+      --accent: #fb923c; --ok: #4ade80; --crit: #f87171; --high: #fb923c; --med: #facc15;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1013; --fg: #e8eaee; --muted: #9aa3b2; --line: #262a31; --card: #161a20;
+    --accent: #fb923c; --ok: #4ade80; --crit: #f87171; --high: #fb923c; --med: #facc15;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 16px 96px; }
+  h1 { font-size: 2.1rem; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { font-size: 1.25rem; margin: 48px 0 12px; }
+  p.lead { font-size: 1.15rem; color: var(--muted); margin: 0 0 28px; }
+  pre, code { font-family: var(--mono); font-size: 0.9rem; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 10px 0; }
+  code.inline { background: var(--card); padding: 1px 5px; border-radius: 4px; }
+  textarea { width: 100%; min-height: 180px; font-family: var(--mono); font-size: 0.85rem; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); resize: vertical; }
+  button { font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--fg); border-color: var(--line); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .result { margin-top: 18px; }
+  .finding { border: 1px solid var(--line); border-left: 4px solid var(--high); border-radius: 8px; padding: 12px 14px; margin: 10px 0; background: var(--card); }
+  .finding.critical { border-left-color: var(--crit); }
+  .finding.medium { border-left-color: var(--med); }
+  .finding .prov { font-weight: 650; }
+  .finding .sev { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-left: 8px; }
+  .finding .val { font-family: var(--mono); font-size: 0.85rem; margin: 4px 0; }
+  .finding .loc { color: var(--muted); font-size: 0.85rem; }
+  .finding a { color: var(--accent); word-break: break-all; }
+  .clean { border: 1px solid var(--ok); color: var(--ok); border-radius: 8px; padding: 12px 14px; font-weight: 600; }
+  .muted { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  a { color: var(--accent); }
+  .cta { border: 1px solid var(--line); border-radius: 10px; padding: 18px; background: var(--card); margin-top: 16px; }
+  footer { margin-top: 64px; color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>leakscan</h1>
+  <p class="lead">Find leaked AI API keys, Claude Code session links and committed <code class="inline">.env</code> files in a repo <strong>and its entire git history</strong>. Then rotate the right thing.</p>
+
+  <pre>pipx install git+https://github.com/genzagents/leakscan
+leakscan .                      # this repo: working tree + every commit on every branch
+leakscan github YOUR_USERNAME   # every public repo you own</pre>
+  <p class="muted">Zero dependencies, one Python file, nothing leaves your machine. <a href="https://github.com/genzagents/leakscan">Source and README</a>.</p>
+
+  <h2>Paste and check</h2>
+  <p>A diff, a log, a <code class="inline">.env</code>, a commit message. Runs in your browser with the same patterns as the CLI. Nothing is uploaded.</p>
+  <textarea id="in" placeholder="OPENAI_API_KEY=sk-proj-...&#10;https://claude.ai/code/session_...&#10;git log -p output, anything" spellcheck="false"></textarea>
+  <div class="row">
+    <button id="scan">Scan</button>
+    <button id="clear" class="secondary">Clear</button>
+    <span class="muted" id="count"></span>
+  </div>
+  <div class="result" id="out"></div>
+
+  <h2>Why</h2>
+  <p>In one week of October 2026 the Railway breach went straight for customers' stored AI API keys, and Claude Code began putting <code class="inline">https://claude.ai/code/…</code> session links into commit messages. A session made public exposes everything it showed, including env vars. Generic scanners know AWS and Stripe. Most do not know OpenRouter, Groq, Replicate, Perplexity, xAI, Hugging Face or agent session links, and almost none tell you where to go to rotate. Deleting a key in a new commit does not remove it from GitHub, so this one reads the whole history.</p>
+
+  <h2>What it finds</h2>
+  <table>
+    <tr><th>Thing</th><th>Rotate at</th></tr>
+    <tr><td>Anthropic, OpenAI (project, service account, admin, legacy), OpenRouter, Groq, Replicate, Hugging Face, Perplexity, xAI, Fireworks, Google AI Studio, ElevenLabs, DeepSeek</td><td>the provider's key page, linked in the output</td></tr>
+    <tr><td>Together, Mistral, Cohere, Voyage, Cerebras, LangSmith, Pinecone, Tavily, Exa, Deepgram, Stability and more</td><td>matched by variable name plus a real-looking value</td></tr>
+    <tr><td>Claude Code session links in commit messages and files</td><td>open the session, make it private or delete it</td></tr>
+    <tr><td><code class="inline">.env</code> files ever committed, even if since deleted</td><td>rotate everything inside, purge from history</td></tr>
+    <tr><td>AWS access keys, GitHub tokens, Stripe live keys, Slack tokens, Supabase service_role JWTs, Resend, Railway tokens, private key blocks</td><td>linked in the output</td></tr>
+  </table>
+
+  <h2>Watch your repos</h2>
+  <p>Free and self-hosted: copy <a href="https://github.com/genzagents/leakscan/blob/main/workflows/leakscan.yml">one workflow file</a> into a repo. It fails the build when a key appears and re-scans every Monday. Set <code class="inline">OWNER</code> and it scans every public repo you own.</p>
+  <div class="cta">
+    <strong>Hosted watch, no workflow to copy.</strong> We watch your public repos around the clock and email you the moment something new leaks, with the exact rotate link. Aimed at £5 a month.
+    <div class="row"><a href="https://github.com/genzagents/leakscan/issues/new?title=Hosted+watch%3A+I+want+this&body=Repos+or+org+to+watch%3A+%0APrice+I+would+pay+per+month%3A+"><button>I want this</button></a> <span class="muted">Opens a GitHub issue. Enough of these and it ships.</span></div>
+  </div>
+
+  <footer>MIT. Built by <a href="https://github.com/genzagents">genzagents</a>. Version <span id="ver"></span>.</footer>
+</main>
+
+<script src="patterns.js"></script>
+<script>
+(function () {
+  const P = window.LEAKSCAN_PATTERNS.map(d => ({ ...d, rx: new RegExp(d.pattern, d.flags + "g") }));
+  const PLACEHOLDER = new RegExp(window.LEAKSCAN_PLACEHOLDER, "i");
+  document.getElementById("ver").textContent = window.LEAKSCAN_VERSION;
+
+  function isPlaceholder(v) {
+    if (PLACEHOLDER.test(v)) return true;
+    const core = v.replace(/^(?:[A-Za-z0-9]{1,8}[-_])+/, "");
+    return new Set(core).size <= 4;
+  }
+  function mask(s) { return s.length <= 12 ? s.slice(0, 3) + "…" : s.slice(0, 8) + "…" + s.slice(-4); }
+  function esc(s) { return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function scan(text) {
+    const out = [];
+    const lines = text.split(/\r?\n/);
+    lines.forEach((raw, i) => {
+      let line = raw;
+      if (/^\+(?!\+\+)/.test(line)) line = line.slice(1); // diff added line
+      if (line.includes("leakscan:ignore")) return;
+      const spans = [];
+      for (const d of P) {
+        d.rx.lastIndex = 0;
+        let m;
+        while ((m = d.rx.exec(line)) !== null) {
+          const secret = m[d.group] ?? m[0];
+          const start = d.group ? line.indexOf(secret, m.index) : m.index;
+          if (spans.some(([a, b]) => a <= start && start < b)) continue;
+          if (d.id !== "private_key" && d.id !== "claude_code_session" && isPlaceholder(secret)) continue;
+          spans.push([start, start + secret.length]);
+          out.push({ d, secret, line: i + 1 });
+          if (m[0].length === 0) d.rx.lastIndex++;
+        }
+      }
+    });
+    return out;
+  }
+
+  const inp = document.getElementById("in"), outEl = document.getElementById("out"), cnt = document.getElementById("count");
+  document.getElementById("scan").onclick = () => {
+    const text = inp.value;
+    if (!text.trim()) { outEl.innerHTML = ""; cnt.textContent = ""; return; }
+    const fs = scan(text);
+    cnt.textContent = fs.length ? fs.length + " finding" + (fs.length > 1 ? "s" : "") : "";
+    if (!fs.length) { outEl.innerHTML = '<div class="clean">✔ Nothing found for the patterns checked.</div>'; return; }
+    outEl.innerHTML = fs.map(f => {
+      const link = /^https?:\/\//.test(f.d.rotate) ? `<a href="${esc(f.d.rotate.split(/\s/)[0])}" target="_blank" rel="noopener">${esc(f.d.rotate)}</a>` : esc(f.d.rotate);
+      return `<div class="finding ${f.d.severity}"><span class="prov">${esc(f.d.provider)}</span><span class="sev">${f.d.severity}</span>
+        <div class="val">${esc(mask(f.secret))}</div>
+        <div class="loc">line ${f.line}</div>
+        <div>→ ${link}</div>${f.d.note ? `<div class="muted">${esc(f.d.note)}</div>` : ""}</div>`;
+    }).join("");
+  };
+  document.getElementById("clear").onclick = () => { inp.value = ""; outEl.innerHTML = ""; cnt.textContent = ""; };
+})();
+</script>
+</body>
+</html>

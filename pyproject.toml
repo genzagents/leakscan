@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leakscan"
+version = "0.1.0"
+description = "Find leaked AI API keys, Claude Code session links and committed .env files in a repo and its whole git history. Zero dependencies."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "genzagents" }]
+keywords = ["secrets", "api-keys", "openai", "anthropic", "git", "security", "claude-code"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Security",
+]
+
+[project.urls]
+Homepage = "https://genzagents.github.io/leakscan/"
+Source = "https://github.com/genzagents/leakscan"
+
+[project.scripts]
+leakscan = "leakscan:main"
+
+[tool.setuptools]
+packages = ["leakscan"]
