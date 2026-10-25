@@ -261,5 +261,5 @@ window.LEAKSCAN_PATTERNS = [
   "note": ""
  }
 ];
-window.LEAKSCAN_PLACEHOLDER = "(?i)(xxxx|your[_\\-]?|example|placeholder|changeme|insert|redacted|dummy|sample|<[a-z_ ]+>|\\$\\{|\\{\\{|\\.\\.\\.|\\*{4,}|0{8,}|1234567890|abcdefghij)";
+window.LEAKSCAN_PLACEHOLDER = "(xxxx|your[_\\-]?|example|placeholder|changeme|insert|redacted|dummy|sample|<[a-z_ ]+>|\\$\\{|\\{\\{|\\.\\.\\.|\\*{4,}|0{8,}|1234567890|abcdefghij)";
 window.LEAKSCAN_VERSION = "0.1.0";
